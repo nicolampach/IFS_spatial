@@ -503,3 +503,76 @@ c22c<-FSS_europe(ifs=ifs_tbl,indic=indic,group=NULL,block=block,rel=T,split=T,ps
 
 save(c22c,file="C22c_2507.RData")
 
+
+# C19 ---------------------------------------------------------------------
+
+indic<-"C19"
+
+ifs_t<-read.csv2(paste(fdir,"/",indic,".csv",sep=""))
+
+ifs<-ifs_t %>% dplyr::select(GEO_LCT,UAAXK0000_ORG,UAA,UAA09S,K0000T,EXT_CORE,NUTS2,YEAR) %>%
+  mutate_at(vars("UAAXK0000_ORG","K0000T","UAA","K0000T","UAA09S","EXT_CORE"),funs(as.numeric)) %>%
+  mutate(Block=case_when(str_detect(NUTS2,"MT")~"1",
+                         str_detect(NUTS2,"CY")~"2",
+                         str_detect(NUTS2,"IE")~"3",
+                         str_detect(NUTS2,"IS")~"4",
+                         str_detect(NUTS2,"FRY")~"5",
+                         T~"6"),
+         UAAXK0000=UAA-K0000T-UAA09S) %>%
+  dplyr::select(-NUTS2,-K0000T,-UAA09S) %>% 
+  na.omit()
+
+con <- DBI::dbConnect(RSQLite::SQLite(), dbname = ":memory:")
+
+copy_to(con,ifs)
+ifs_tbl <- tbl(con, "ifs")
+
+rm(list=c("ifs","ifs_t"))
+
+gc()
+
+block<-ifs_tbl %>% as.data.frame() %>% distinct(Block) %>% mutate(Block=as.numeric(Block)) %>% arrange(Block) %>% 
+  pull()  %>% paste("%",.,"%",sep="")
+
+c19_rev<-FSS_europe(ifs=ifs_tbl,indic="C19",group=NULL,block=block,
+                vars=c("UAAXK0000_ORG","UAA"),
+                weights=c("EXT_CORE"))
+
+save(c19_rev,file="C19_rev.RData")
+
+# C20 ---------------------------------------------------------------------
+
+indic<-"C20"
+
+ifs_t<-read.csv2(paste(fdir,"/",indic,".csv",sep=""))
+
+ifs<-ifs_t %>% dplyr::select(GEO_LCT,UAAT_IB,UAA,C2000T,K0000T,UAAS,EXT_CORE,NUTS2,YEAR) %>%
+  mutate_at(vars("UAAT_IB","UAA","C2000T","K0000T","UAAS","EXT_CORE"),funs(as.numeric)) %>%
+  mutate(Block=case_when(str_detect(NUTS2,"MT")~"1",
+                         str_detect(NUTS2,"CY")~"2",
+                         str_detect(NUTS2,"IE")~"3",
+                         str_detect(NUTS2,"IS")~"4",
+                         str_detect(NUTS2,"FRY")~"5",
+                         T~"6"),
+         UAA_IB=UAAT_IB+UAAS) %>%
+  dplyr::select(-NUTS2,-UAAT_IB,-UAAS,-C2000T,-K0000T) %>% 
+  na.omit()
+
+con <- DBI::dbConnect(RSQLite::SQLite(), dbname = ":memory:")
+
+copy_to(con,ifs)
+ifs_tbl <- tbl(con, "ifs")
+
+rm(list=c("ifs","ifs_t"))
+
+gc()
+
+block<-ifs_tbl %>% as.data.frame() %>% distinct(Block) %>% mutate(Block=as.numeric(Block)) %>% arrange(Block) %>% 
+  pull()  %>% paste("%",.,"%",sep="")
+
+c20<-FSS_europe(ifs=ifs_tbl,indic=indic,group=NULL,block=block,
+                  vars=c("UAA_IB","UAA"),
+                  weights=c("EXT_CORE"))
+
+save(c20,file="C20_20251211.RData")
+
