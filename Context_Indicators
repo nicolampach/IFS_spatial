@@ -1,1 +1,161 @@
-# R script to produce grid layers of the context indicators
+# Producing grid data from farm statistics --------------------------------
+
+# Check that you are connected to the internet
+.connect2internet()
+
+# Install packages
+install.packages(c("viridis","stars","ggplot2","tidyverse","raster","terra","sf",
+                   "DBI","DescTools","RSQLite","devtools","leaflet","remotes"),        # Using repos argument
+                 repos = "https://cran.wu.ac.at/")
+
+install.packages(c("plyr","vardpoor","sjmisc","giscoR","eurostat"),        # Using repos argument
+                  repos = "https://cran.wu.ac.at/")
+
+
+# Libraries
+library(sf)
+library(viridis)
+library(ggplot2)
+library(stars)
+library(tidyverse)
+library(raster)
+library(parallel)
+library(plyr)
+library(terra)
+library(dplyr)
+library(DBI)
+library(DescTools)
+library(RSQLite)
+library(MRG)
+library(giscoR)
+library(leaflet)
+
+# Set working directory 
+fdir="H:/JRC/JRC_Maps/Atlas"
+setwd(fdir)
+
+# Function to run the grid layers by using several options
+# indic: name of the context indicator
+# var_filter: used to discard certain values from variable to be gridded 
+# block: breakdown variable such as farmtype classes
+
+FSS_europe<-function(ifs,indic,var_filter=NULL,block=block,group=NULL,pseudo=NULL,sumsmall=F,rel=F,verb=F,strata=NULL,split=F,vars,weights){
+  himg00=NULL
+  if (is.null(group)){
+    if (indic!="C23"){
+      for (x in block){
+        
+        if (!is.null(var_filter)){
+        ifs_sub<-ifs %>% 
+          filter(Block %like% x) %>%
+          data.frame() %>% 
+          filter(!!rlang::sym(var_filter)>0) %>% 
+          fssgeo(.,crsOut=3035,locAdj="LL") %>% 
+          st_transform(.,3035)}
+        else{
+          ifs_sub<-ifs %>% 
+            filter(Block %like% x) %>%
+            data.frame() %>% 
+            fssgeo(.,crsOut=3035,locAdj="LL") %>% 
+            st_transform(.,3035)
+        }
+        
+        fssObject = createMRGobject(ifg = ifs_sub, vars = vars,
+                                    weights=weights,geovar="geometry",nclus=1,strat=strata,
+                                    locAdj = "LL",checkReliability = rel,postProcess =F,
+                                    pseudoreg=pseudo,verbose=verb,
+                                    suppresslim = 0.05,sumsmall=sumsmall,reliabilitySplit = split)
+        gc()
+        rm("ifs_sub")
+        himg01=multiResGrid(fssObject,nclus=1)
+        himg02=MRGpostProcess(himg01,rounding="varying")
+        himg00<- himg00 %>% bind_rows(himg02)
+        rm(list=c("fssObject","himg02"))
+        gc()
+        print(x)
+      }}
+    else {
+      for (x in block){
+        ifs_sub<-ifs %>% 
+          filter(Block %like% x) %>%
+          data.frame()
+        
+        fssObject = createMRGobject(ifg = ifs_sub, vars = vars,
+                                    weights=weights,geovar="GEO_LCT",nclus=1,strat=strata,
+                                    locAdj = "LL",checkReliability = rel,postProcess =F,
+                                    pseudoreg=pseudo,verbose=verb,
+                                    suppresslim = 0.05,sumsmall=sumsmall,reliabilitySplit = split)
+        gc()
+        rm("ifs_sub")
+        himg02=multiResGrid(fssObject,nclus=1)
+        himg02=MRGpostProcess(himg01,rounding="varying")
+        himg00<- himg00 %>% bind_rows(himg02)
+        rm(list=c("fssObject","himg02"))
+        gc()
+        print(x)
+      }}
+  }
+  else{
+    for (x in block){
+      ifs_sub<-ifs %>% 
+        filter(Block %like% x) %>%
+        data.frame()
+      
+      for (y in (unique(ifs_sub[[group]]))){
+        ifs_cov<-ifs_sub %>% filter((!!sym(group))==y)
+        
+        fssObject = createMRGobject(ifg = ifs_cov, vars = vars,
+                                    weights=weights,geovar="GEO_LCT",nclus=2,strat=strata,
+                                    pseudoreg=pseudo,
+                                    locAdj = "LL",checkReliability = rel,postProcess =T,
+                                    suppresslim = 0.05,sumsmall=sumsmall,reliabilitySplit = split)
+        gc()
+        rm("ifs_cov")
+        himg01=multiResGrid(fssObject,nclus=1)
+        himg001<-himg01 %>% mutate(group=y)
+        himg00<- himg00 %>% bind_rows(himg001)
+        rm(list=c("fssObject","himg01"))
+        gc()
+        print(paste("Block:",x," Group:",y,sep=""))
+      }
+      
+    }
+  }
+  return(himg00)
+}
+
+
+# C17 ---------------------------------------------------------------------
+
+indic<-"C17"
+
+ifs_t<-read.csv2(paste(fdir,"/",indic,".csv",sep=""))
+
+ifs<-ifs_t %>% dplyr::select(GEO_LCT,UAA,HLD_FEF,SO_EURO,EXT_CORE,NUTS2,YEAR) %>%
+  mutate_at(vars("UAA","EXT_CORE","SO_EURO","HLD_FEF"),funs(as.numeric)) %>%
+  mutate(Block=case_when(str_detect(NUTS2,"MT")~"1",
+                         str_detect(NUTS2,"CY")~"2",
+                         str_detect(NUTS2,"IE")~"3",
+                         str_detect(NUTS2,"IS")~"4",
+                         str_detect(NUTS2,"FRY")~"5",
+                         T~"6")) %>%
+  dplyr::select(-NUTS2)
+
+
+con <- DBI::dbConnect(RSQLite::SQLite(), dbname = ":memory:")
+
+copy_to(con,ifs)
+ifs_tbl <- tbl(con, "ifs")
+
+rm(list=c("ifs","ifs_t"))
+
+gc()
+
+block<-ifs_tbl %>% as.data.frame() %>% distinct(Block) %>% mutate(Block=as.numeric(Block)) %>% arrange(Block) %>% 
+  pull()  %>% paste("%",.,"%",sep="")
+
+c17<-FSS_europe(ifs=ifs_tbl,indic=indic,group=NULL,block=block,
+                vars=c("SO_EURO","UAA"),
+                weights=c("EXT_CORE"))
+
+save(c17,file="C17_2507.RData")
