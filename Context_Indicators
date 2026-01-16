@@ -159,3 +159,307 @@ c17<-FSS_europe(ifs=ifs_tbl,indic=indic,group=NULL,block=block,
                 weights=c("EXT_CORE"))
 
 save(c17,file="C17_2507.RData")
+
+# C18 ---------------------------------------------------------------------
+
+indic<-"C18"
+
+ifs_t<-read.csv2(paste(fdir,"/",indic,".csv",sep=""))
+
+ifs<-ifs_t %>% dplyr::select(GEO_LCT,UAA,ARA,PECR,J0000T,Q0000T,EXT_CORE,NUTS2,YEAR) %>%
+  mutate_at(vars("ARA","PECR","J0000T","Q0000T","UAA"),as.numeric) %>%
+  mutate(Block=case_when(str_detect(NUTS2,"MT")~"1",
+                         str_detect(NUTS2,"CY")~"2",
+                         str_detect(NUTS2,"IE")~"3",
+                         str_detect(NUTS2,"DK|SE")~"4",
+                         str_detect(NUTS2,"IS")~"4",
+                         str_detect(NUTS2,"FRY")~"5",
+                         T~"6")) %>%
+  dplyr::select(-NUTS2)
+
+
+con <- DBI::dbConnect(RSQLite::SQLite(), dbname = ":memory:")
+
+copy_to(con,ifs)
+ifs_tbl <- tbl(con, "ifs")
+
+rm(list=c("ifs","ifs_t"))
+
+gc()
+
+block<-ifs_tbl %>% as.data.frame() %>% distinct(Block) %>% mutate(Block=as.numeric(Block)) %>% arrange(Block) %>% 
+  pull()  %>% paste("%",.,"%",sep="")
+
+c18a<-FSS_europe(ifs=ifs_tbl,group=NULL,block=block,
+                vars=c("UAA"),
+                weights=c("EXT_CORE"))
+
+gc()
+
+c18b<-FSS_europe(ifs=ifs_tbl,group=NULL,block=block,
+                 vars=c("ARA","UAA"),
+                 weights=c("EXT_CORE"))
+
+gc()
+
+c18c<-FSS_europe(ifs=ifs_tbl,group=NULL,block=block,
+                 vars=c("PECR","UAA"),
+                 weights=c("EXT_CORE"))
+
+block<-ifs_tbl %>% as.data.frame() %>%  filter(J0000T>0) %>% distinct(Block) %>% 
+  mutate(Block=as.numeric(Block)) %>% arrange(Block) %>% 
+  pull()  %>% paste("%",.,"%",sep="")
+
+c18d<-FSS_europe(ifs=ifs_tbl,group=NULL,block=block,
+                 vars=c("J0000T","UAA"),
+                 weights=c("EXT_CORE"))
+
+gc()
+
+block<-ifs_tbl %>% as.data.frame() %>%  filter(Q0000T>0,!is.na(Q0000T)) %>% distinct(Block) %>% 
+  mutate(Block=as.numeric(Block)) %>% arrange(Block) %>% 
+  pull()  %>% paste("%",.,"%",sep="")
+
+c18e<-FSS_europe(ifs=ifs_tbl,group=NULL,block=block,
+                 vars=c("Q0000T","UAA"),
+                 weights=c("EXT_CORE"))
+
+save(c18a,c18b,c18c,c18d,c18e,file="C18.RData")
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Xylella crops included in c18 layer
+
+indic<-"XYL"
+
+ifs_t<-read.csv2(paste(fdir,"/",indic,".csv",sep=""))
+
+ifs<-ifs_t %>% dplyr::select(GEO_LCT,F4000T,T0000T,W1000T,O1000T,L0000T,UAAS,UAA,EXT_CORE,NUTS2,YEAR) %>%
+  mutate_at(vars("F4000T","T0000T","W1000T","O1000T","UAAS","L0000T","UAA","EXT_CORE"),funs(as.numeric)) %>%
+  mutate(Block=case_when(str_detect(NUTS2,"MT")~"1",
+                         str_detect(NUTS2,"CY")~"2",
+                         str_detect(NUTS2,"IE")~"3",
+                         #str_detect(NUTS2,"FI|SE|NO")~"4",
+                         #str_detect(NUTS2,"SE")~"5",
+                         #str_detect(NUTS2,"NO")~"6",
+                         str_detect(NUTS2,"IS")~"4",
+                         str_detect(NUTS2,"FRY")~"5",
+                         #str_detect(NUTS2,"RO")~"9",
+                         T~"6")
+  ) %>%
+  dplyr::select(-NUTS2) %>% 
+  na.omit()
+
+con <- DBI::dbConnect(RSQLite::SQLite(), dbname = ":memory:")
+
+copy_to(con,ifs)
+ifs_tbl <- tbl(con, "ifs")
+
+rm(list=c("ifs","ifs_t"))
+
+gc()
+
+block<-ifs_tbl %>% as.data.frame() %>% filter(T0000T>0) %>% distinct(Block) %>% mutate(Block=as.numeric(Block)) %>% arrange(Block) %>% 
+  pull()  %>% paste("%",.,"%",sep="")
+
+xyl1<-FSS_europe(ifs=ifs_tbl,indic=indic,group=NULL,block=block,
+                 vars=c("F4000T","UAA"),
+                 weights=c("EXT_CORE"))
+
+xyl2<-FSS_europe(ifs=ifs_tbl,indic=indic,group=NULL,block=block,
+                 vars=c("W1000T","UAA"),
+                 weights=c("EXT_CORE"))
+
+xyl3<-FSS_europe(ifs=ifs_tbl,indic=indic,group=NULL,block=block,
+                 vars=c("O1000T","UAA"),
+                 weights=c("EXT_CORE"))
+
+xyl4<-FSS_europe(ifs=ifs_tbl,var_filter="T0000T",indic=indic,group=NULL,block=block,
+                 vars=c("T0000T","UAA"),
+                 weights=c("EXT_CORE"))
+
+block<-ifs_tbl %>% as.data.frame() %>% distinct(Block) %>% mutate(Block=as.numeric(Block)) %>% arrange(Block) %>% 
+  pull()  %>% paste("%",.,"%",sep="")
+
+xyl5<-FSS_europe(ifs=ifs_tbl,indic=indic,group=NULL,block=block,
+                 vars=c("UAAS","UAA"),
+                 weights=c("EXT_CORE"))
+
+xyl6<-FSS_europe(ifs=ifs_tbl,indic=indic,group=NULL,block=block,
+                 vars=c("L0000T","UAA"),
+                 weights=c("EXT_CORE"))
+
+
+save(xyl1,xyl2,xyl3,file="Xylella_2507.RData")
+
+save(xyl4,xyl5,xyl6,file="Xylella2_2510.RData")
+
+
+# C21  --------------------------------------------------------------------
+
+indic<-"C21"
+
+ifs_t<-read.csv2(paste(fdir,"/",indic,".csv",sep=""))
+
+ifs<-ifs_t %>% dplyr::select(GEO_LCT,A0010_LSU,UAA,EXT_CORE,NUTS2,YEAR) %>%
+  mutate_at(vars("A0010_LSU","UAA","EXT_CORE"),funs(as.numeric)) %>%
+  mutate(Block=case_when(str_detect(NUTS2,"MT")~"1",
+                         str_detect(NUTS2,"CY")~"2",
+                         str_detect(NUTS2,"IE")~"3",
+                         str_detect(NUTS2,"IS")~"4",
+                         str_detect(NUTS2,"FRY")~"5",
+                         T~"6"))
+  dplyr::select(-NUTS2) %>% 
+  na.omit()
+  
+con <- DBI::dbConnect(RSQLite::SQLite(), dbname = ":memory:")
+
+copy_to(con,ifs)
+ifs_tbl <- tbl(con, "ifs")
+
+rm(list=c("ifs","ifs_t"))
+
+gc()
+
+block<-ifs_tbl %>% as.data.frame() %>% distinct(Block) %>% mutate(Block=as.numeric(Block)) %>% arrange(Block) %>% 
+  pull()  %>% paste("%",.,"%",sep="")
+
+c21a<-FSS_europe(ifs=ifs_tbl,group=NULL,block=block,
+                vars=c("A0010_LSU","UAA"),
+                weights=c("EXT_CORE"))
+
+save(c21a,file="C21a.RData")
+
+ifs_t<-read.csv2(paste(fdir,"/",indic,".csv",sep=""))
+
+ifs<-ifs_t %>% dplyr::select(GEO_LCT,A2000,A3100,A4100,A4200,A5140,A5110O,A5000X5100,EXT_CORE,NUTS2,YEAR) %>%
+  mutate_at(vars("A2000","A3100","A4100","A4200","A5140","A5110O","A5000X5100","EXT_CORE"),
+            funs(as.numeric)) %>%
+  mutate(Block=case_when(str_detect(NUTS2,"MT")~"1",
+                         str_detect(NUTS2,"CY")~"2",
+                         str_detect(NUTS2,"IE")~"3",
+                         str_detect(NUTS2,"IS")~"4",
+                         str_detect(NUTS2,"FRY")~"5",
+                         T~"6"),
+  A5000=A5140+A5110O+A5000X5100) %>%
+  dplyr::select(-NUTS2,-A5140,-A5110O,-A5000X5100) %>% 
+  na.omit()
+
+con <- DBI::dbConnect(RSQLite::SQLite(), dbname = ":memory:")
+
+copy_to(con,ifs)
+ifs_tbl <- tbl(con, "ifs")
+
+rm(list=c("ifs","ifs_t"))
+
+gc()
+
+block<-ifs_tbl %>% as.data.frame() %>% distinct(Block) %>% mutate(Block=as.numeric(Block)) %>% arrange(Block) %>% 
+  pull()  %>% paste("%",.,"%",sep="")
+
+c21b<-FSS_europe(ifs=ifs_tbl,group=NULL,block=block,
+                 vars=c("A2000"),
+                 weights=c("EXT_CORE"))
+
+save(c21b,file="C21b.RData")
+
+c21c<-FSS_europe(ifs=ifs_tbl,group=NULL,block=block,
+                 vars=c("A3100"),
+                 weights=c("EXT_CORE"))
+
+save(c21c,file="C21c.RData")
+
+
+c21d<-FSS_europe(ifs=ifs_tbl,group=NULL,block=block,
+                 vars=c("A4100"),
+                 weights=c("EXT_CORE"))
+
+save(c21d,file="C21d.RData")
+
+
+c21e<-FSS_europe(ifs=ifs_tbl,group=NULL,block=block,
+                 vars=c("A4200"),
+                 weights=c("EXT_CORE"))
+
+save(c21e,file="C21e.RData")
+
+
+c21f<-FSS_europe(ifs=ifs_tbl,group=NULL,block=block,
+                 vars=c("A5000"),
+                 weights=c("EXT_CORE"))
+
+save(c21f,file="C21f.RData")
+
+
+# C22 ---------------------------------------------------------------------
+
+indic<-"C22"
+
+ifs_t<-read.csv2(paste(fdir,"/",indic,".csv",sep=""))
+
+ifs<-ifs_t %>%
+  mutate_at(vars("FLF_D_R_T_AWU","FLF_D_NR_AWU","FLF_ND_AWU","FLF_D_R_T_PERS",
+                 "FLF_D_RFAM_T_PERS","FLF_D_RNFAM_T_PERS",
+                 "FLF_D_RFAM_HLD_T_AWU","FLF_D_RNFAM_T_AWU","FLF_D_RFAMXHLD_T_AWU",
+                 "EXT_LAFO"),as.numeric) %>% as_tibble() %>% 
+  filter(HLD_FEF=="0", EXT_LAFO>0) %>% 
+  mutate(Block=case_when(str_detect(NUTS2,"MT")~"1",
+                         str_detect(NUTS2,"CY")~"2",
+                         str_detect(NUTS2,"IE")~"3",
+                         str_detect(NUTS2,"IS")~"4",
+                         str_detect(NUTS2,"FRY")~"5",
+                         T~"6"),
+         STRA_ID_LAFO=case_when(is.na(STRA_ID_LAFO)~0,T~STRA_ID_LAFO),
+         FLF_D_R_T_PERS=case_when(is.na(FLF_D_R_T_PERS)~0,T~FLF_D_R_T_PERS),
+         FLF_D_RFAM_T_PERS=case_when(is.na(FLF_D_RFAM_T_PERS)~0,T~FLF_D_RFAM_T_PERS),
+         FLF_D_RNFAM_T_PERS=case_when(is.na(FLF_D_RNFAM_T_PERS)~0,T~FLF_D_RNFAM_T_PERS),
+         FLF_D_NR_AWU=case_when(is.na(FLF_D_NR_AWU)~0,T~FLF_D_NR_AWU),
+         FLF_ND_AWU=case_when(is.na(FLF_ND_AWU)~0,T~FLF_ND_AWU),
+         FLF_D_R_T_AWU=case_when(is.na(FLF_D_R_T_AWU)~0,T~FLF_D_R_T_AWU),
+         FLF_D_RFAM_HLD_T_AWU=case_when(is.na(FLF_D_RFAM_HLD_T_AWU)~0,T~FLF_D_RFAM_HLD_T_AWU),
+         FLF_D_RFAMXHLD_T_AWU=case_when(is.na(FLF_D_RFAMXHLD_T_AWU)~0,T~FLF_D_RFAMXHLD_T_AWU),
+         FLF_D_RNFAM_T_AWU=case_when(is.na(FLF_D_RNFAM_T_AWU)~0,T~FLF_D_RNFAM_T_AWU),
+         AWU=FLF_D_R_T_AWU+FLF_D_NR_AWU+FLF_ND_AWU,
+         AWU_FAM=FLF_D_RFAM_HLD_T_AWU+FLF_D_RFAMXHLD_T_AWU,
+         AWU_NFAM=FLF_D_RNFAM_T_AWU,
+         AWU_WORKER=FLF_D_NR_AWU+FLF_ND_AWU,
+         LEG_FORM_1=case_when(LEG_FORM %in% c("FARM_HLD", "FARM_HLD_SPOUFAM",
+                                       "FARM_SPOU", "FARM_FAM", "FARM_NFAM")~"PER_NTL",
+                              T~"OTH"),
+         FAM_FARM=case_when(LEG_FORM_1=="OTH"|(((FLF_D_RFAM_HLD_T_AWU+FLF_D_RFAMXHLD_T_AWU)/(FLF_D_RFAM_HLD_T_AWU+FLF_D_RFAMXHLD_T_AWU+FLF_D_RNFAM_T_AWU+FLF_D_NR_AWU+FLF_ND_AWU))<0.5)~0,
+                            T~1)) %>%
+  dplyr::select(GEO_LCT,NUTS2,YEAR,EXT_LAFO,STRA_ID_LAFO,FLF_D_R_T_PERS,FLF_D_RFAM_T_PERS,FLF_D_RNFAM_T_PERS,AWU,AWU_FAM,AWU_NFAM,AWU_WORKER,FAM_FARM,Block) 
+
+con <- DBI::dbConnect(RSQLite::SQLite(), dbname = ":memory:")
+
+copy_to(con,ifs)
+ifs_tbl <- tbl(con, "ifs")
+
+rm(list=c("ifs","ifs_t"))
+
+gc()
+
+block<-ifs_tbl %>% as.data.frame() %>% distinct(Block) %>% mutate(Block=as.numeric(Block)) %>% arrange(Block) %>% 
+  pull()  %>% paste("%",.,"%",sep="")
+
+c22a<-FSS_europe(ifs=ifs_tbl,indic=indic,group=NULL,block=block,rel=T,split=T,pseudo="NUTS2",verb=2,
+                vars=c("FAM_FARM"),
+                weights=c("EXT_LAFO"),
+                strata="STRA_ID_LAFO")
+
+save(c22a,file="C22a_2507.RData")
+
+
+c22b<-FSS_europe(ifs=ifs_tbl,indic=indic,group=NULL,block=block,rel=T,split=T,pseudo="NUTS2",verb=2,
+                 vars=c("FLF_D_R_T_PERS","FLF_D_RFAM_T_PERS","FLF_D_RNFAM_T_PERS"),
+                 weights=c("EXT_LAFO"),
+                strata="STRA_ID_LAFO")
+
+save(c22b,file="C22b_2507.RData")
+
+c22c<-FSS_europe(ifs=ifs_tbl,indic=indic,group=NULL,block=block,rel=T,split=T,pseudo="NUTS2",verb=2,
+                 vars=c("AWU","AWU_FAM","AWU_NFAM","AWU_WORKER"),
+                 weights=c("EXT_LAFO"),
+                 strata="STRA_ID_LAFO")
+
+save(c22c,file="C22c_2507.RData")
+
