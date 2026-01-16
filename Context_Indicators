@@ -389,6 +389,46 @@ c21f<-FSS_europe(ifs=ifs_tbl,group=NULL,block=block,
 
 save(c21f,file="C21f.RData")
 
+# Grazing density part of c21 layer
+
+indic<-"GD"
+
+ifs_t<-read.csv2(paste(fdir,"/",indic,".csv",sep=""))
+
+ifs<-ifs_t %>% dplyr::select(GEO_LCT,A0011,G0000_J1000_2000_R9000,EXT_CORE,NUTS2,YEAR) %>%
+  mutate_at(vars("A0011","G0000_J1000_2000_R9000","EXT_CORE"),funs(as.numeric)) %>%
+  mutate(Block=case_when(str_detect(NUTS2,"MT")~"1",
+                         str_detect(NUTS2,"CY")~"2",
+                         str_detect(NUTS2,"IE")~"3",
+                         #str_detect(NUTS2,"FI|SE|NO")~"4",
+                         #str_detect(NUTS2,"SE")~"5",
+                         #str_detect(NUTS2,"NO")~"6",
+                         str_detect(NUTS2,"IS")~"4",
+                         str_detect(NUTS2,"FRY")~"5",
+                         #str_detect(NUTS2,"RO")~"9",
+                         T~"6")
+  ) %>%
+  dplyr::select(-NUTS2) %>% 
+  na.omit()
+
+con <- DBI::dbConnect(RSQLite::SQLite(), dbname = ":memory:")
+
+copy_to(con,ifs)
+ifs_tbl <- tbl(con, "ifs")
+
+rm(list=c("ifs","ifs_t"))
+
+gc()
+
+block<-ifs_tbl %>% as.data.frame() %>% distinct(Block) %>% mutate(Block=as.numeric(Block)) %>% arrange(Block) %>% 
+  pull()  %>% paste("%",.,"%",sep="")
+
+gd<-FSS_europe(ifs=ifs_tbl,indic=indic,group=NULL,block=block,
+               vars=c("A0011","G0000_J1000_2000_R9000"),
+               weights=c("EXT_CORE"))
+
+save(gd,file="GD.RData")
+
 
 # C22 ---------------------------------------------------------------------
 
